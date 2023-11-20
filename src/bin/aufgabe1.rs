@@ -20,9 +20,8 @@ impl ToString for Relationship {
     }
 }
 
-// Alle Fehler sind unterhalb dieser Zeile
+// Alle Fehler waren unterhalb dieser Zeile
 
-// FIXME
 fn main() {
     let people = vec![
         ("Michael Scott", 3499.99),
@@ -40,7 +39,6 @@ fn main() {
         })
         .collect();
 
-    // Erstelle einen neuen OfficeEmployee mit deinem eigenen Namen und deinem Wunschgehalt
     employees.push(OfficeEmployee {
         name: String::from("Jan L"),
         salary: 300.0,
@@ -54,7 +52,7 @@ fn main() {
         }
     }
     println!("Michael: It's important to understand the friendship dynamics in an Office. Let me tell you about the people who work here:\n");
-    // Hier wird zweimal der geliche Vec mutable geborrowt. Man muss unten die Funktionssignatur anpassen und dann von &mut zu & wechseln
+    // Hier wird zweimal der gleiche Vec mutable geborrowt. Man muss unten die Funktionssignatur anpassen und dann von &mut zu & wechseln
     let pairs = all_pairs(&employees, &employees);
     let relationships = rank_relationship(&pairs);
 
@@ -62,7 +60,7 @@ fn main() {
         println!("{}", r.to_string());
     }
 
-    // Nach dem man unten die Funktion verbessert hat muss man auch hier borrowen
+    // Nachdem man unten die Funktion verbessert hat muss man auch hier borrowen
     if let Some(avg_salary) = calc_mean_salary(&employees) {
         println!("\nMichael: Just so you know, the average salary here is ${:.2}. But I am certain you will make a lot more.", avg_salary);
     }
@@ -75,7 +73,8 @@ fn main() {
     }
 }
 
-// Hier muss darf man kein Ownership vom String übernehmen und muss somit &str entgegennehmen
+// Hier darf man kein Ownership vom String übernehmen und muss somit &str entgegennehmen
+// Wenn man hier Ownership nimmt, dann stiehlt man den Wert aus der struct
 fn first_name(name: &str) -> Option<&str> {
     match name.find(" ") {
         Some(pos) => Some(&name[..pos]),
@@ -83,7 +82,7 @@ fn first_name(name: &str) -> Option<&str> {
     }
 }
 
-// Hier muss man den Vec borrowen
+// Hier muss man den Vec borrowen, da der Vec auch nach diesem Funktionsaufruf noch benutzt wird
 fn calc_mean_salary(people: &Vec<OfficeEmployee>) -> Option<f64> {
     if people.len() == 0 {
         return None;
@@ -92,7 +91,7 @@ fn calc_mean_salary(people: &Vec<OfficeEmployee>) -> Option<f64> {
     Some(s / (people.len() as f64))
 }
 
-// Hier wird unnötig als mutable geborrowt. Wenn man an den Eingabe- und Ausgabetypen mut entfernt, dann klappt alles.
+// Hier wird unnötig mutable geborrowed. Wenn man an den Eingabe- und Ausgabetypen "mut" entfernt, dann klappt alles.
 fn all_pairs<'a>(
     p1: &'a Vec<OfficeEmployee>,
     p2: &'a Vec<OfficeEmployee>,
@@ -110,9 +109,8 @@ fn all_pairs<'a>(
 
 fn rank_relationship(pairs: &Vec<(&OfficeEmployee, &OfficeEmployee)>) -> Vec<Relationship> {
     let mut r = vec![];
-    // Alle anderen sollten als Freunde abgespeichert werden;
+    // Alle anderen sollten als Freunde abgespeichert werden
     for (p, o) in pairs {
-        // Hier fehlt ein match-Arm, der für alle anderen Konstelationen Friend zurückgibt
         let rel = match (p.name.as_str(), o.name.as_str()) {
             ("Jim Halpert", "Dwight Schrute") => {
                 Relationship::Frenemies(p.name.clone(), o.name.clone())
@@ -122,6 +120,7 @@ fn rank_relationship(pairs: &Vec<(&OfficeEmployee, &OfficeEmployee)>) -> Vec<Rel
             }
             ("Pam Beesly", "Jim Halpert") => Relationship::Married(p.name.clone(), o.name.clone()),
             ("Jim Halpert", "Pam Beesly") => Relationship::Married(p.name.clone(), o.name.clone()),
+            // Hier fehlte der Match-Arm, der alle fehlenden Relationen umsetzt
             (_, _) => Relationship::Friends(p.name.clone(), o.name.clone()),
         };
         r.push(rel);
