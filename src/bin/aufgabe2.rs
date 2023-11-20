@@ -11,36 +11,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     let parsed = parse(&content);
 
     let mut out = File::create("out.html")?;
-    
+
     write_as_html(&mut out, &parsed)?;
     Ok(())
 }
 
 // Datenstrukturen definieren
 
-enum MarkdownElem {
-    Heading(Heading),
-    UnorderedList(UnorderedList),
-    RichText(RichText),
+enum MarkdownElem <'a> {
+    Heading(Heading <'a>),
+    UnorderedList(UnorderedList <'a>),
+    RichText(RichText <'a>),
 }
 
-struct RichText {
-    content: Vec<ModifiedText>,
+struct RichText<'a> {
+    content: Vec<ModifiedText<'a>>,
 }
 
-enum ModifiedText {
-    Plain(String),
-    Italic(String),
+enum ModifiedText<'a> {
+    Plain(&'a str),
+    Italic(&'a str),
 }
 
-struct UnorderedList {
-    items: Vec<RichText>,
+struct UnorderedList <'a> {
+    items: Vec<RichText<'a>>,
 }
 
-enum Heading {
-    H1(RichText),
-    H2(RichText),
-    H3(RichText),
+enum Heading <'a> {
+    H1(RichText<'a>),
+    H2(RichText<'a>),
+    H3(RichText<'a>),
 }
 
 fn parse(markdown: &str) -> Vec<MarkdownElem> {
@@ -83,24 +83,27 @@ fn parse_rich_text(markdown: &str, offset: usize) -> (usize, RichText) {
         match (is_italic, c) {
             (false, '*') => {
                 if i != parse_begin {
-                    richt_text_elems.push(ModifiedText::Plain(markdown[parse_begin..i].to_string()));
+                    richt_text_elems
+                        .push(ModifiedText::Plain(&markdown[parse_begin..i]));
                 }
                 is_italic = true;
                 parse_begin = i;
             }
             (true, '*') => {
                 richt_text_elems.push(ModifiedText::Italic(
-                    markdown[parse_begin + 1..i].to_string(),
+                    &markdown[parse_begin + 1..i],
                 ));
                 parse_begin = i + 1;
                 is_italic = false;
             }
             (_, '\n') => {
-                richt_text_elems.push(ModifiedText::Plain(markdown[parse_begin..i].to_string()));
+                richt_text_elems.push(ModifiedText::Plain(&markdown[parse_begin..i]));
                 break;
             }
             (_, _) if i == markdown.len() - 1 => {
-                richt_text_elems.push(ModifiedText::Plain(markdown[parse_begin..i + 1].to_string()));
+                richt_text_elems.push(ModifiedText::Plain(
+                    &markdown[parse_begin..i + 1],
+                ));
             }
             (_, _) => {}
         }
@@ -118,7 +121,8 @@ fn parse_heading(markdown: &str, offset: usize) -> (usize, Heading) {
         .chars()
         .skip(offset)
         .take_while(|c| *c == '#')
-        .count().min(3);
+        .count()
+        .min(3);
     let mut read = count_head;
     let (rich_read, heading_text) = parse_rich_text(markdown, offset + count_head);
     read += rich_read;
