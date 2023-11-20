@@ -8,11 +8,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let path = env::args().nth(1).ok_or("Expected a path to a .md file")?;
     let content = fs::read_to_string(path)?;
 
-    // Den content parsen
     let parsed = parse(&content);
 
-    // Eine NEUE html-Datei öffnen
     let mut out = File::create("out.html")?;
+    
     write_as_html(&mut out, &parsed)?;
     Ok(())
 }
