@@ -1,1 +1,1 @@
-Das ist ein *Text*
+Das ist ein Text

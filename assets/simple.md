@@ -1,6 +1,6 @@
 # Test your application
 
-- List *Item 1* with italicized text
+- List Item 1
 - List Item 2
 - List Item 3
 

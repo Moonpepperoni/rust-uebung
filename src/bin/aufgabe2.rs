@@ -8,7 +8,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let path = env::args().nth(1).ok_or("Expected a path to a .md file")?;
     let content = fs::read_to_string(path)?;
 
-    let parsed = parse(&content);
+    let parser = Parser::new(content);
+    let parsed = parser.parse_all();
 
     let mut out = File::create("out.html")?;
 
@@ -18,137 +19,116 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 // Datenstrukturen definieren
 
-enum MarkdownElem <'a> {
-    Heading(Heading <'a>),
-    UnorderedList(UnorderedList <'a>),
-    RichText(RichText <'a>),
+enum MarkdownElem {
+    Heading(Heading),
+    UnorderedList(UnorderedList),
+    PlainText(String),
 }
 
-struct RichText<'a> {
-    content: Vec<ModifiedText<'a>>,
+struct UnorderedList {
+    items: Vec<String>,
 }
 
-enum ModifiedText<'a> {
-    Plain(&'a str),
-    Italic(&'a str),
+enum Heading {
+    H1(String),
+    H2(String),
+    H3(String),
 }
 
-struct UnorderedList <'a> {
-    items: Vec<RichText<'a>>,
+struct Parser {
+    offset: usize,
+    markdown: String,
+    elems: Vec<MarkdownElem>,
 }
 
-enum Heading <'a> {
-    H1(RichText<'a>),
-    H2(RichText<'a>),
-    H3(RichText<'a>),
-}
-
-fn parse(markdown: &str) -> Vec<MarkdownElem> {
-    let mut elems = vec![];
-    let mut offset: usize = 0;
-    while offset < markdown.len() {
-        // read entire line and decide what to do
-        let end_pos = markdown
-            .chars()
-            .skip(offset)
-            .position(|c| c == '\n')
-            .unwrap_or_else(|| markdown.len() - 1);
-        let line = &markdown[offset..offset + end_pos + 1];
-        let (read, elem) = if line.trim().is_empty() {
-            offset += end_pos + 1;
-            continue;
-        } else if line.starts_with("#") {
-            let (read, elem) = parse_heading(markdown, offset);
-            (read, MarkdownElem::Heading(elem))
-        } else if line.starts_with("- ") {
-            let (read, elem) = parse_unordered_list(markdown, offset);
-            (read, MarkdownElem::UnorderedList(elem))
-        } else {
-            let (read, elem) = parse_rich_text(markdown, offset);
-            (read, MarkdownElem::RichText(elem))
-        };
-        offset += read;
-        elems.push(elem);
-    }
-    elems
-}
-
-fn parse_rich_text(markdown: &str, offset: usize) -> (usize, RichText) {
-    let mut richt_text_elems = vec![];
-    let mut read = 0;
-    let mut is_italic = false;
-    let mut parse_begin = offset;
-    for (i, c) in markdown.char_indices().skip(offset) {
-        read += 1;
-        match (is_italic, c) {
-            (false, '*') => {
-                if i != parse_begin {
-                    richt_text_elems
-                        .push(ModifiedText::Plain(&markdown[parse_begin..i]));
-                }
-                is_italic = true;
-                parse_begin = i;
-            }
-            (true, '*') => {
-                richt_text_elems.push(ModifiedText::Italic(
-                    &markdown[parse_begin + 1..i],
-                ));
-                parse_begin = i + 1;
-                is_italic = false;
-            }
-            (_, '\n') => {
-                richt_text_elems.push(ModifiedText::Plain(&markdown[parse_begin..i]));
-                break;
-            }
-            (_, _) if i == markdown.len() - 1 => {
-                richt_text_elems.push(ModifiedText::Plain(
-                    &markdown[parse_begin..i + 1],
-                ));
-            }
-            (_, _) => {}
+impl Parser {
+    fn new(markdown: String) -> Parser {
+        Parser {
+            offset: 0,
+            markdown: markdown,
+            elems: Vec::new(),
         }
     }
-    (
-        read,
-        RichText {
-            content: richt_text_elems,
-        },
-    )
-}
 
-fn parse_heading(markdown: &str, offset: usize) -> (usize, Heading) {
-    let count_head = markdown
-        .chars()
-        .skip(offset)
-        .take_while(|c| *c == '#')
-        .count()
-        .min(3);
-    let mut read = count_head;
-    let (rich_read, heading_text) = parse_rich_text(markdown, offset + count_head);
-    read += rich_read;
-    let level = match count_head {
-        1 => Heading::H1(heading_text),
-        2 => Heading::H2(heading_text),
-        3 => Heading::H3(heading_text),
-        _ => Heading::H3(heading_text),
-    };
-    (read, level)
-}
-
-fn parse_unordered_list(markdown: &str, r: usize) -> (usize, UnorderedList) {
-    let mut items = vec![];
-    let i = r;
-    let mut read = 0;
-    while i + read < markdown.len() {
-        let c = markdown.chars().nth(i + read).unwrap();
-        let (text_read, text) = match c {
-            '-' => parse_rich_text(markdown, i + read + 1),
-            _ => break,
-        };
-        read += text_read + 1;
-        items.push(text);
+    fn parse_all(mut self) -> Vec<MarkdownElem> {
+        while self.offset < self.markdown.len() {
+            let current = self.markdown.chars().nth(self.offset).unwrap();
+            if current == '#' {
+                self.parse_heading();
+            } else if current == '-' {
+                self.parse_list();
+            } else {
+                self.parse_plain_text();
+            }
+        }
+        self.elems
     }
-    (read, UnorderedList { items })
+
+    fn parse_heading(&mut self) {
+        let count_head = self
+            .markdown
+            .chars()
+            .skip(self.offset)
+            .take_while(|c| *c == '#')
+            .count()
+            .min(3);
+        self.offset += count_head;
+        let line = self.parse_line();
+        match line {
+            Some(heading_text) => {
+                let level = match count_head {
+                    1 => Heading::H1(heading_text),
+                    2 => Heading::H2(heading_text),
+                    3 => Heading::H3(heading_text),
+                    _ => Heading::H3(heading_text),
+                };
+                self.elems.push(MarkdownElem::Heading(level));
+            }
+            None => {}
+        }
+    }
+
+    fn parse_list(&mut self) {
+        let mut items = vec![];
+        while self.offset < self.markdown.len()
+            && self.markdown.chars().nth(self.offset).unwrap() == '-'
+        {
+            self.offset += 1;
+            let line = self.parse_line();
+            match line {
+                Some(text) => {
+                    items.push(text);
+                }
+                None => {}
+            }
+        }
+        self.elems
+            .push(MarkdownElem::UnorderedList(UnorderedList { items }));
+    }
+
+    fn parse_plain_text(&mut self) {
+        let line = self.parse_line();
+        match line {
+            Some(text) => {
+                self.elems.push(MarkdownElem::PlainText(text));
+            }
+            None => {}
+        }
+    }
+
+    fn parse_line(&mut self) -> Option<String> {
+        let line: String = self
+            .markdown
+            .chars()
+            .skip(self.offset)
+            .take_while(|&c| c != '\n')
+            .collect();
+        self.offset += line.len() + 1;
+        if line.trim().is_empty() {
+            return None;
+        }
+        return Some(line);
+    }
 }
 
 // Schreiben des HTMLs
@@ -164,8 +144,8 @@ fn write_as_html(out: &mut File, parsed: &Vec<MarkdownElem>) -> Result<(), io::E
             MarkdownElem::UnorderedList(list) => {
                 write_list_html(out, list)?;
             }
-            MarkdownElem::RichText(text) => {
-                write_standalone_rich_html(out, text)?;
+            MarkdownElem::PlainText(text) => {
+                write_plain_text_html(out, text)?;
             }
         }
     }
@@ -174,9 +154,9 @@ fn write_as_html(out: &mut File, parsed: &Vec<MarkdownElem>) -> Result<(), io::E
     Ok(())
 }
 
-fn write_standalone_rich_html(out: &mut File, text: &RichText) -> Result<(), io::Error> {
+fn write_plain_text_html(out: &mut File, text: &String) -> Result<(), io::Error> {
     write!(out, "<p>")?;
-    write_inner_rich_html(out, text)?;
+    write_inner_text_html(out, text)?;
     writeln!(out, "</p>")?;
     Ok(())
 }
@@ -185,20 +165,15 @@ fn write_list_html(out: &mut File, list: &UnorderedList) -> Result<(), io::Error
     writeln!(out, "<ul>")?;
     for t in &list.items {
         write!(out, "<li>")?;
-        write_inner_rich_html(out, t)?;
+        write_inner_text_html(out, t)?;
         writeln!(out, "</li>")?;
     }
     writeln!(out, "</ul>")?;
     Ok(())
 }
 
-fn write_inner_rich_html(out: &mut File, t: &RichText) -> Result<(), io::Error> {
-    for t in &t.content {
-        match t {
-            ModifiedText::Italic(content) => write!(out, "<em>{}</em>", content)?,
-            ModifiedText::Plain(content) => write!(out, "{}", content)?,
-        };
-    }
+fn write_inner_text_html(out: &mut File, t: &String) -> Result<(), io::Error> {
+    write!(out, "{}", t)?;
     Ok(())
 }
 
@@ -206,17 +181,17 @@ fn write_heading_html(out: &mut File, heading: &Heading) -> Result<(), io::Error
     match heading {
         Heading::H1(text) => {
             write!(out, "<h1>")?;
-            write_inner_rich_html(out, text)?;
+            write_inner_text_html(out, text)?;
             writeln!(out, "</h1>")?;
         }
         Heading::H2(text) => {
             write!(out, "<h2>")?;
-            write_inner_rich_html(out, text)?;
+            write_inner_text_html(out, text)?;
             writeln!(out, "</h2>")?;
         }
         Heading::H3(text) => {
             write!(out, "<h3>")?;
-            write_inner_rich_html(out, text)?;
+            write_inner_text_html(out, text)?;
             writeln!(out, "</h3>")?;
         }
     }
