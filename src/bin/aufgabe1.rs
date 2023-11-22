@@ -53,7 +53,7 @@ fn main() {
     }
     println!("Michael: It's important to understand the friendship dynamics in an Office. Let me tell you about the people who work here:\n");
     // Hier wird zweimal der gleiche Vec mutable geborrowt. Man muss unten die Funktionssignatur anpassen und dann von &mut zu & wechseln
-    let pairs = all_pairs(&employees, &employees);
+    let pairs = all_pairs(&employees);
     let relationships = rank_relationship(&pairs);
 
     for r in &relationships {
@@ -91,21 +91,6 @@ fn calc_mean_salary(people: &Vec<OfficeEmployee>) -> Option<f64> {
     Some(s / (people.len() as f64))
 }
 
-// Hier wird unnötig mutable geborrowed. Wenn man an den Eingabe- und Ausgabetypen "mut" entfernt, dann klappt alles.
-fn all_pairs<'a>(
-    p1: &'a Vec<OfficeEmployee>,
-    p2: &'a Vec<OfficeEmployee>,
-) -> Vec<(&'a OfficeEmployee, &'a OfficeEmployee)> {
-    let mut pairs = vec![];
-    for p in p1 {
-        for o in p2 {
-            if p != o && !pairs.iter().any(|(l, r)| *l == o && *r == p) {
-                pairs.push((p, o));
-            }
-        }
-    }
-    return pairs;
-}
 
 fn rank_relationship(pairs: &Vec<(&OfficeEmployee, &OfficeEmployee)>) -> Vec<Relationship> {
     let mut r = vec![];
@@ -126,4 +111,19 @@ fn rank_relationship(pairs: &Vec<(&OfficeEmployee, &OfficeEmployee)>) -> Vec<Rel
         r.push(rel);
     }
     r
+}
+
+// Hier gab es nichts zu tun
+fn all_pairs(
+  p1: &Vec<OfficeEmployee>,
+) -> Vec<(&OfficeEmployee, &OfficeEmployee)> {
+  let mut pairs = vec![];
+  for p in p1 {
+      for o in p1 {
+          if p != o && !pairs.iter().any(|(l, r)| *l == o && *r == p) {
+              pairs.push((p, o));
+          }
+      }
+  }
+  return pairs;
 }
