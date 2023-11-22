@@ -52,7 +52,7 @@ fn main() {
       }
     }
     println!("Michael: It's important to understand the friendship dynamics in an Office. Let me tell you about the people who work here:\n");
-    let pairs = all_pairs(&mut employees, &mut employees);
+    let pairs = all_pairs(&employees);
     let relationships = rank_relationship(&pairs);
 
     for r in relationships {
@@ -84,22 +84,6 @@ fn calc_mean_salary(people: Vec<OfficeEmployee>) -> Option<f64> {
 }
 
 // FIXME
-fn all_pairs<'a>(
-    p1: &'a mut Vec<OfficeEmployee>,
-    p2: &'a mut Vec<OfficeEmployee>,
-) -> Vec<(&'a mut OfficeEmployee, &'a mut OfficeEmployee)> {
-    let mut pairs = vec![];
-    for p in p1 {
-        for o in p2 {
-            if p != o && !pairs.iter().any(|(l, r)| *l == o && *r == p) {
-                pairs.push((p, o));
-            }
-        }
-    }
-    return pairs;
-}
-
-// FIXME
 fn rank_relationship(pairs: &Vec<(&OfficeEmployee, &OfficeEmployee)>) -> Vec<Relationship> {
     let mut r = vec![];
     // Alle anderen sollten als Freunde abgespeichert werden;
@@ -117,4 +101,19 @@ fn rank_relationship(pairs: &Vec<(&OfficeEmployee, &OfficeEmployee)>) -> Vec<Rel
         r.push(rel);
     }
     r
+}
+
+// Hier gibt es nichts zu tun
+fn all_pairs(
+  p1: &Vec<OfficeEmployee>,
+) -> Vec<(&OfficeEmployee, &OfficeEmployee)> {
+  let mut pairs = vec![];
+  for p in p1 {
+      for o in p1 {
+          if p != o && !pairs.iter().any(|(l, r)| *l == o && *r == p) {
+              pairs.push((p, o));
+          }
+      }
+  }
+  return pairs;
 }
